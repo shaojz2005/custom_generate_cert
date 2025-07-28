@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>证书生成器示例</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .example-data {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .certificate-template {
+            border: 2px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            background: linear-gradient(45deg, #f0f8ff, #e6f3ff);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>批量证书生成器 - 使用示例</h1>
+    
+    <h2>1. Excel数据格式示例</h2>
+    <p>请准备一个Excel文件，第一行为表头，后续行为数据：</p>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>姓名</th>
+                <th>奖项</th>
+                <th>部门</th>
+                <th>日期</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>张三</td>
+                <td>优秀员工奖</td>
+                <td>技术部</td>
+                <td>2024-01-15</td>
+            </tr>
+            <tr>
+                <td>李四</td>
+                <td>进步奖</td>
+                <td>销售部</td>
+                <td>2024-01-15</td>
+            </tr>
+            <tr>
+                <td>王五</td>
+                <td>创新奖</td>
+                <td>研发部</td>
+                <td>2024-01-15</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>2. 证书模板示例</h2>
+    <div class="certificate-template">
+        <h2>荣誉证书</h2>
+        <br>
+        <p style="font-size: 18px;">
+            <strong>{{姓名}}</strong> 同志：
+        </p>
+        <br>
+        <p style="font-size: 16px;">
+            您在 <strong>{{部门}}</strong> 工作期间表现优异，<br>
+            特授予您 <strong style="color: #d4af37;">{{奖项}}</strong>，<br>
+            以资鼓励！
+        </p>
+        <br>
+        <p style="text-align: right; margin-right: 50px;">
+            颁发日期：{{日期}}
+        </p>
+        <br>
+        <p style="text-align: right; margin-right: 50px;">
+            ________________<br>
+            颁发单位
+        </p>
+    </div>
+
+    <h2>3. 使用步骤</h2>
+    <ol>
+        <li><strong>准备Excel文件</strong>：按照上述格式准备包含获奖人员信息的Excel文件</li>
+        <li><strong>准备背景图</strong>：选择一张高质量的证书背景图片（建议分辨率至少1920x1080）</li>
+        <li><strong>打开应用</strong>：在浏览器中打开 index.html</li>
+        <li><strong>上传文件</strong>：分别上传Excel文件和背景图片</li>
+        <li><strong>设计证书</strong>：
+            <ul>
+                <li>点击"添加文本"创建文本区域</li>
+                <li>在文本中使用 {{字段名}} 格式插入变量</li>
+                <li>调整文本位置、大小、颜色等样式</li>
+                <li>可以添加多个文本区域</li>
+            </ul>
+        </li>
+        <li><strong>生成证书</strong>：点击生成按钮，系统会为每行数据生成一张证书并打包下载</li>
+    </ol>
+
+    <h2>4. 变量使用说明</h2>
+    <div class="example-data">
+        <p><strong>变量格式</strong>：{{字段名}}</p>
+        <p><strong>示例</strong>：</p>
+        <ul>
+            <li>{{姓名}} - 会被替换为Excel中对应行的姓名</li>
+            <li>{{奖项}} - 会被替换为Excel中对应行的奖项</li>
+            <li>{{部门}} - 会被替换为Excel中对应行的部门</li>
+            <li>{{日期}} - 会被替换为Excel中对应行的日期</li>
+        </ul>
+    </div>
+
+    <h2>5. 注意事项</h2>
+    <ul>
+        <li>Excel文件必须包含表头行</li>
+        <li>字段名要与Excel表头完全一致</li>
+        <li>建议使用高分辨率背景图以保证证书质量</li>
+        <li>文本位置和大小会按比例缩放到原始图片尺寸</li>
+        <li>生成的证书为PNG格式，打包在ZIP文件中</li>
+    </ul>
+
+    <p style="text-align: center; margin-top: 40px;">
+        <a href="index.html" style="background: #007cba; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+            开始使用证书生成器
+        </a>
+    </p>
+</body>
+</html>

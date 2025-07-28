@@ -1,0 +1,269 @@
+const { createApp } = Vue;
+
+createApp({
+    data() {
+        return {
+            step: 1,
+            excelData: [],
+            excelHeaders: [],
+            backgroundImage: null,
+            backgroundImageFile: null,
+            textElements: [],
+            selectedElement: null,
+            nextElementId: 1,
+            canvasWidth: 800,
+            canvasHeight: 600,
+            isDragging: false,
+            dragOffset: { x: 0, y: 0 },
+            isGenerating: false,
+            generationProgress: 0,
+            currentGeneratingIndex: 0
+        };
+    },
+    computed: {
+        canProceedToStep2() {
+            return this.excelData.length > 0 && this.backgroundImage;
+        }
+    },
+    methods: {
+        // 文件上传处理
+        handleExcelUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    if (jsonData.length > 0) {
+                        this.excelHeaders = jsonData[0];
+                        this.excelData = jsonData.slice(1).map(row => {
+                            const obj = {};
+                            this.excelHeaders.forEach((header, index) => {
+                                obj[header] = row[index] || '';
+                            });
+                            return obj;
+                        });
+                    }
+                } catch (error) {
+                    alert('Excel文件解析失败，请检查文件格式');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        },
+
+        handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            this.backgroundImageFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                this.backgroundImage = e.target.result;
+                
+                // 创建图片对象来获取原始尺寸
+                const img = new Image();
+                img.onload = () => {
+                    // 计算合适的画布尺寸，保持宽高比
+                    const maxWidth = 800;
+                    const maxHeight = 600;
+                    const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+                    
+                    this.canvasWidth = Math.floor(img.width * ratio);
+                    this.canvasHeight = Math.floor(img.height * ratio);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        },
+
+        // 步骤导航
+        nextStep() {
+            if (this.step < 3) {
+                this.step++;
+            }
+        },
+
+        prevStep() {
+            if (this.step > 1) {
+                this.step--;
+            }
+        },
+
+        // 文本元素管理
+        addTextElement() {
+            const newElement = {
+                id: this.nextElementId++,
+                text: '点击编辑文本',
+                x: 50,
+                y: 50,
+                fontSize: 24,
+                color: '#000000',
+                fontWeight: 'normal'
+            };
+            this.textElements.push(newElement);
+            this.selectElement(newElement);
+        },
+
+        selectElement(element) {
+            this.selectedElement = element;
+        },
+
+        deselectElement() {
+            this.selectedElement = null;
+        },
+
+        deleteSelectedElement() {
+            if (this.selectedElement) {
+                const index = this.textElements.indexOf(this.selectedElement);
+                if (index > -1) {
+                    this.textElements.splice(index, 1);
+                    this.selectedElement = null;
+                }
+            }
+        },
+
+        insertVariable(header) {
+            if (this.selectedElement) {
+                this.selectedElement.text += `{{${header}}}`;
+            }
+        },
+
+        // 拖拽功能
+        startDrag(element, event) {
+            this.isDragging = true;
+            this.selectElement(element);
+            
+            const rect = event.currentTarget.getBoundingClientRect();
+            const canvasRect = event.currentTarget.parentElement.getBoundingClientRect();
+            
+            this.dragOffset = {
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top
+            };
+
+            const handleMouseMove = (e) => {
+                if (this.isDragging && this.selectedElement === element) {
+                    const canvasRect = document.querySelector('.canvas-container').getBoundingClientRect();
+                    const newX = e.clientX - canvasRect.left - this.dragOffset.x;
+                    const newY = e.clientY - canvasRect.top - this.dragOffset.y;
+                    
+                    element.x = Math.max(0, Math.min(newX, this.canvasWidth - 100));
+                    element.y = Math.max(0, Math.min(newY, this.canvasHeight - 30));
+                }
+            };
+
+            const handleMouseUp = () => {
+                this.isDragging = false;
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
+
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        },
+
+        // 证书生成
+        async generateCertificates() {
+            if (this.excelData.length === 0 || !this.backgroundImage) {
+                alert('请确保已上传Excel文件和背景图片');
+                return;
+            }
+
+            this.isGenerating = true;
+            this.generationProgress = 0;
+            this.currentGeneratingIndex = 0;
+
+            const zip = new JSZip();
+            const certificates = [];
+
+            for (let i = 0; i < this.excelData.length; i++) {
+                this.currentGeneratingIndex = i;
+                this.generationProgress = Math.round((i / this.excelData.length) * 100);
+                
+                const rowData = this.excelData[i];
+                const canvas = await this.createCertificateCanvas(rowData);
+                
+                // 将canvas转换为blob
+                const blob = await new Promise(resolve => {
+                    canvas.toBlob(resolve, 'image/png');
+                });
+                
+                // 生成文件名，使用第一个字段的值或索引
+                const fileName = rowData[this.excelHeaders[0]] || `certificate_${i + 1}`;
+                zip.file(`${fileName}.png`, blob);
+                
+                // 添加小延迟以避免浏览器卡顿
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+
+            this.generationProgress = 100;
+            
+            // 生成并下载zip文件
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            saveAs(zipBlob, 'certificates.zip');
+            
+            this.isGenerating = false;
+            alert('证书生成完成！');
+        },
+
+        async createCertificateCanvas(rowData) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // 设置画布尺寸为原始图片尺寸
+                const img = new Image();
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    
+                    // 绘制背景图
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // 计算缩放比例
+                    const scaleX = img.width / this.canvasWidth;
+                    const scaleY = img.height / this.canvasHeight;
+                    
+                    // 绘制文本元素
+                    this.textElements.forEach(element => {
+                        let text = element.text;
+                        
+                        // 替换变量
+                        this.excelHeaders.forEach(header => {
+                            const regex = new RegExp(`{{${header}}}`, 'g');
+                            text = text.replace(regex, rowData[header] || '');
+                        });
+                        
+                        ctx.font = `${element.fontWeight} ${element.fontSize * scaleY}px Arial`;
+                        ctx.fillStyle = element.color;
+                        ctx.textBaseline = 'top';
+                        
+                        // 处理多行文本
+                        const lines = text.split('\n');
+                        lines.forEach((line, lineIndex) => {
+                            ctx.fillText(
+                                line,
+                                element.x * scaleX,
+                                (element.y + lineIndex * element.fontSize * 1.2) * scaleY
+                            );
+                        });
+                    });
+                    
+                    resolve(canvas);
+                };
+                img.src = this.backgroundImage;
+            });
+        }
+    },
+
+    mounted() {
+        // 防止页面刷新时丢失数据，可以考虑添加localStorage支持
+        console.log('批量证书生成器已加载');
+    }
+}).mount('#app');

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>批量证书生成器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        .canvas-container {
+            position: relative;
+            border: 2px dashed #d1d5db;
+            background-color: #f9fafb;
+        }
+        .text-element {
+            position: absolute;
+            cursor: move;
+            border: 1px dashed transparent;
+            padding: 2px;
+            min-width: 50px;
+            min-height: 20px;
+        }
+        .text-element:hover {
+            border-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        .text-element.selected {
+            border-color: #ef4444;
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+        .dragging {
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="app">
+        <div class="container mx-auto px-4 py-8">
+            <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">批量证书生成器</h1>
+            
+            <!-- 步骤指示器 -->
+            <div class="flex justify-center mb-8">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                             :class="step >= 1 ? 'bg-blue-500' : 'bg-gray-300'">1</div>
+                        <span class="ml-2 text-sm font-medium text-gray-700">上传文件</span>
+                    </div>
+                    <div class="w-8 h-0.5 bg-gray-300"></div>
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                             :class="step >= 2 ? 'bg-blue-500' : 'bg-gray-300'">2</div>
+                        <span class="ml-2 text-sm font-medium text-gray-700">设计证书</span>
+                    </div>
+                    <div class="w-8 h-0.5 bg-gray-300"></div>
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                             :class="step >= 3 ? 'bg-blue-500' : 'bg-gray-300'">3</div>
+                        <span class="ml-2 text-sm font-medium text-gray-700">生成下载</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤1: 文件上传 -->
+            <div v-if="step === 1" class="max-w-4xl mx-auto">
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4">1. 上传Excel文件</h2>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                        <input type="file" @change="handleExcelUpload" accept=".xlsx,.xls" class="hidden" ref="excelInput">
+                        <button @click="$refs.excelInput.click()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                            选择Excel文件
+                        </button>
+                        <p class="text-gray-500 mt-2">支持 .xlsx 和 .xls 格式</p>
+                        <div v-if="excelData.length > 0" class="mt-4 text-left">
+                            <p class="text-green-600 font-medium">✓ 已上传文件，共 {{ excelData.length }} 行数据</p>
+                            <p class="text-sm text-gray-600 mt-1">字段: {{ excelHeaders.join(', ') }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4">2. 上传证书背景图</h2>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                        <input type="file" @change="handleImageUpload" accept="image/*" class="hidden" ref="imageInput">
+                        <button @click="$refs.imageInput.click()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                            选择背景图片
+                        </button>
+                        <p class="text-gray-500 mt-2">支持 JPG、PNG 等图片格式</p>
+                        <div v-if="backgroundImage" class="mt-4">
+                            <p class="text-green-600 font-medium">✓ 已上传背景图</p>
+                            <img :src="backgroundImage" class="max-w-xs mx-auto mt-2 rounded border">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mt-6">
+                    <button @click="nextStep" :disabled="!canProceedToStep2" 
+                            class="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white px-6 py-2 rounded-lg">
+                        下一步：设计证书
+                    </button>
+                </div>
+            </div>
+
+            <!-- 步骤2: 证书设计 -->
+            <div v-if="step === 2" class="max-w-6xl mx-auto">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <!-- 左侧工具栏 -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white rounded-lg shadow-md p-4 sticky top-4">
+                            <h3 class="font-semibold mb-4">工具栏</h3>
+                            
+                            <div class="mb-4">
+                                <button @click="addTextElement" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mb-2">
+                                    添加文本
+                                </button>
+                            </div>
+
+                            <div class="mb-4">
+                                <h4 class="font-medium mb-2">可用字段</h4>
+                                <div class="space-y-1">
+                                    <div v-for="header in excelHeaders" :key="header" 
+                                         class="text-sm bg-gray-100 px-2 py-1 rounded cursor-pointer hover:bg-gray-200"
+                                         @click="insertVariable(header)">
+                                        {{ header }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-if="selectedElement" class="border-t pt-4">
+                                <h4 class="font-medium mb-2">文本属性</h4>
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">字体大小</label>
+                                        <input v-model.number="selectedElement.fontSize" type="number" min="8" max="100"
+                                               class="w-full border rounded px-2 py-1">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">颜色</label>
+                                        <input v-model="selectedElement.color" type="color"
+                                               class="w-full border rounded px-2 py-1 h-8">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">字体粗细</label>
+                                        <select v-model="selectedElement.fontWeight" class="w-full border rounded px-2 py-1">
+                                            <option value="normal">正常</option>
+                                            <option value="bold">粗体</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">文本内容</label>
+                                        <textarea v-model="selectedElement.text" 
+                                                  class="w-full border rounded px-2 py-1 h-20 text-sm"></textarea>
+                                    </div>
+                                    <button @click="deleteSelectedElement" 
+                                            class="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded">
+                                        删除元素
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 中间画布区域 -->
+                    <div class="lg:col-span-3">
+                        <div class="bg-white rounded-lg shadow-md p-4">
+                            <h3 class="font-semibold mb-4">证书设计画布</h3>
+                            <div class="canvas-container mx-auto" 
+                                 :style="{ width: canvasWidth + 'px', height: canvasHeight + 'px', backgroundImage: `url(${backgroundImage})`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }"
+                                 @click="deselectElement">
+                                <div v-for="(element, index) in textElements" :key="element.id"
+                                     class="text-element"
+                                     :class="{ selected: selectedElement === element }"
+                                     :style="{ 
+                                         left: element.x + 'px', 
+                                         top: element.y + 'px',
+                                         fontSize: element.fontSize + 'px',
+                                         color: element.color,
+                                         fontWeight: element.fontWeight
+                                     }"
+                                     @click.stop="selectElement(element)"
+                                     @mousedown="startDrag(element, $event)">
+                                    {{ element.text }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-6 space-x-4">
+                            <button @click="prevStep" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg">
+                                上一步
+                            </button>
+                            <button @click="nextStep" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg">
+                                下一步：生成证书
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤3: 生成下载 -->
+            <div v-if="step === 3" class="max-w-4xl mx-auto">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4">3. 生成证书</h2>
+                    
+                    <div class="text-center mb-6">
+                        <button @click="generateCertificates" :disabled="isGenerating"
+                                class="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white px-8 py-3 rounded-lg text-lg font-medium">
+                            <span v-if="!isGenerating">生成所有证书</span>
+                            <span v-else>生成中... {{ generationProgress }}%</span>
+                        </button>
+                    </div>
+
+                    <div v-if="isGenerating" class="mb-6">
+                        <div class="bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-500 h-2 rounded-full transition-all duration-300" 
+                                 :style="{ width: generationProgress + '%' }"></div>
+                        </div>
+                        <p class="text-center text-sm text-gray-600 mt-2">
+                            正在生成第 {{ currentGeneratingIndex + 1 }} / {{ excelData.length }} 张证书
+                        </p>
+                    </div>
+
+                    <div class="text-center space-x-4">
+                        <button @click="prevStep" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg">
+                            上一步
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
