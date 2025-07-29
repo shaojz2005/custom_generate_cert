@@ -17,7 +17,9 @@ createApp({
             dragOffset: { x: 0, y: 0 },
             isGenerating: false,
             generationProgress: 0,
-            currentGeneratingIndex: 0
+            currentGeneratingIndex: 0,
+            showPreview: false,
+            previewDataInfo: ''
         };
     },
     computed: {
@@ -210,6 +212,86 @@ createApp({
             
             this.isGenerating = false;
             alert('证书生成完成！');
+        },
+
+        // 预览功能
+        async previewCertificate() {
+            if (this.excelData.length === 0) {
+                alert('请先上传Excel文件');
+                return;
+            }
+            
+            // 使用第一条记录的数据
+            const firstRowData = this.excelData[0];
+            
+            // 生成预览信息
+            const previewInfo = this.excelHeaders.map(header => 
+                `${header}: ${firstRowData[header] || ''}`
+            ).join(', ');
+            this.previewDataInfo = previewInfo;
+            
+            this.showPreview = true;
+            
+            // 等待DOM更新后创建预览
+            await this.$nextTick();
+            await this.createPreviewCanvas(firstRowData);
+        },
+        
+        closePreview() {
+            this.showPreview = false;
+        },
+        
+        async createPreviewCanvas(rowData) {
+            return new Promise((resolve) => {
+                const canvas = this.$refs.previewCanvas;
+                const ctx = canvas.getContext('2d');
+                
+                const img = new Image();
+                img.onload = () => {
+                    // 设置预览画布尺寸，保持合适的显示大小
+                    const maxDisplayWidth = 800;
+                    const maxDisplayHeight = 600;
+                    const ratio = Math.min(maxDisplayWidth / img.width, maxDisplayHeight / img.height);
+                    
+                    canvas.width = img.width * ratio;
+                    canvas.height = img.height * ratio;
+                    
+                    // 绘制背景图
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // 计算缩放比例
+                    const scaleX = canvas.width / this.canvasWidth;
+                    const scaleY = canvas.height / this.canvasHeight;
+                    
+                    // 绘制文本元素
+                    this.textElements.forEach(element => {
+                        let text = element.text;
+                        
+                        // 替换变量
+                        this.excelHeaders.forEach(header => {
+                            const regex = new RegExp(`{{${header}}}`, 'g');
+                            text = text.replace(regex, rowData[header] || '');
+                        });
+                        
+                        ctx.font = `${element.fontWeight} ${element.fontSize * scaleY}px Arial`;
+                        ctx.fillStyle = element.color;
+                        ctx.textBaseline = 'top';
+                        
+                        // 处理多行文本
+                        const lines = text.split('\n');
+                        lines.forEach((line, lineIndex) => {
+                            ctx.fillText(
+                                line,
+                                element.x * scaleX,
+                                (element.y + lineIndex * element.fontSize * 1.2) * scaleY
+                            );
+                        });
+                    });
+                    
+                    resolve(canvas);
+                };
+                img.src = this.backgroundImage;
+            });
         },
 
         async createCertificateCanvas(rowData) {
