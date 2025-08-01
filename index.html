@@ -191,6 +191,10 @@
                             <button @click="prevStep" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg">
                                 上一步
                             </button>
+                            <button @click="previewCertificate" :disabled="excelData.length === 0" 
+                                    class="bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 text-white px-6 py-2 rounded-lg">
+                                预览证书
+                            </button>
                             <button @click="nextStep" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg">
                                 下一步：生成证书
                             </button>
@@ -225,6 +229,29 @@
                     <div class="text-center space-x-4">
                         <button @click="prevStep" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg">
                             上一步
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 预览模态框 -->
+        <div v-if="showPreview" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="closePreview">
+            <div class="bg-white rounded-lg shadow-xl max-w-4xl max-h-[90vh] overflow-auto" @click.stop>
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold">证书预览</h3>
+                        <button @click="closePreview" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                    </div>
+                    <div class="text-center mb-4">
+                        <p class="text-sm text-gray-600">使用第一条记录数据预览：{{ previewDataInfo }}</p>
+                    </div>
+                    <div class="flex justify-center">
+                        <canvas ref="previewCanvas" class="border border-gray-300 max-w-full max-h-[60vh]"></canvas>
+                    </div>
+                    <div class="text-center mt-4">
+                        <button @click="closePreview" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg">
+                            关闭预览
                         </button>
                     </div>
                 </div>
