@@ -1,3 +1,28 @@
+/**
+ * 批量证书生成器 - Vue.js应用
+ * 
+ * Copyright (c) 2024 [您的姓名或组织名称]
+ * 
+ * 本作品采用知识共享署名-非商业性使用 4.0 国际许可协议进行许可。
+ * This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.
+ * 
+ * 您可以自由地：
+ * - 共享 — 在任何媒介以任何形式复制、发行本作品
+ * - 演绎 — 修改、转换或以本作品为基础进行创作
+ * 
+ * 惟须遵守下列条件：
+ * - 署名 — 您必须给出适当的署名，提供指向本许可协议的链接，同时标明是否作了修改
+ * - 非商业性使用 — 您不得将本作品用于商业目的
+ * 
+ * 完整许可协议：https://creativecommons.org/licenses/by-nc/4.0/legalcode.zh-Hans
+ * 
+ * 功能：
+ * 1. Excel文件上传和解析
+ * 2. 背景图片上传
+ * 3. 可视化证书设计
+ * 4. 批量生成和下载
+ */
+
 const { createApp } = Vue;
 
 createApp({

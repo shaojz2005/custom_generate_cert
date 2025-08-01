@@ -99,4 +99,56 @@ Excel文件示例：
 
 ## 许可证
 
-MIT License
+本项目采用 **Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0)** 许可证。
+
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
+
+### 使用条件
+
+✅ **允许的使用方式**：
+- **个人使用** - 学习、研究、个人项目
+- **非商业分享** - 复制、分发给他人
+- **修改代码** - 改进、定制功能
+- **制作衍生作品** - 基于本项目创建新项目
+- **教育用途** - 教学、培训使用
+
+❌ **禁止的使用方式**：
+- **商业使用** - 不得用于任何商业目的
+- **销售** - 不得直接或间接销售本软件
+- **商业服务** - 不得基于本软件提供付费服务
+
+⚠️ **必须遵守的条件**：
+- **署名要求** - 必须保留原作者版权声明
+- **许可证声明** - 必须包含CC BY-NC 4.0许可证信息
+- **修改说明** - 如有修改，需要说明变更内容
+- **非商业声明** - 明确标注非商业使用
+
+### 版权声明
+
+```
+Copyright (c) 2024 Aeven
+
+本作品采用知识共享署名-非商业性使用 4.0 国际许可协议进行许可。
+This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.
+
+您可以自由地共享和演绎本作品，但不得用于商业目的，且必须署名。
+You are free to share and adapt this work for non-commercial purposes with attribution.
+```
+
+### 商业使用说明
+
+如果您希望将本项目用于商业目的，请通过以下方式联系作者获得商业许可：
+- 💬 GitHub Issues：在本项目提交Issue说明商业使用需求
+
+### 免责声明
+
+本软件按"原样"提供，不提供任何形式的明示或暗示担保。作者不承担任何因使用本软件而产生的损害责任。
+
+---
+
+### 许可证详情
+
+- 📄 **完整许可证文本**：[CC BY-NC 4.0 Legal Code](https://creativecommons.org/licenses/by-nc/4.0/legalcode.zh-Hans)
+- 🌐 **许可证概述**：[CC BY-NC 4.0 Deed](https://creativecommons.org/licenses/by-nc/4.0/deed.zh)
+
+如果您使用了本项目的代码，请遵守上述许可证条款。感谢您的理解与支持！ 🙏
