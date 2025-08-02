@@ -112,9 +112,10 @@
         }
     </style>
 </head>
-<body class="bg-gray-100">
-    <div id="app">
-        <div class="container mx-auto px-4 py-8">
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <div id="app" class="flex flex-col min-h-screen">
+        <main class="flex-1">
+            <div class="container mx-auto px-4 py-8">
             <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">批量证书生成器</h1>
             
             <!-- 功能介绍区 -->
@@ -356,10 +357,29 @@
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-xl font-semibold mb-4">3. 生成证书</h2>
                     
+                    <!-- 生成说明信息 -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-blue-500 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div>
+                                <h3 class="text-lg font-medium text-blue-900 mb-2">生成说明</h3>
+                                <div class="text-blue-800 space-y-2">
+                                    <p>• 将根据您上传的Excel数据生成 <strong class="text-blue-900">{{ excelData.length }} 张</strong> 证书</p>
+                                    <p>• 每张证书将使用Excel中对应行的数据替换模板中的变量</p>
+                                    <p>• 生成完成后，系统会自动弹出下载窗口，下载一个包含所有证书的ZIP压缩包</p>
+                                    <p>• 证书文件格式为PNG图片，文件名将使用Excel第一列的内容命名（如：张三.png）</p>
+                                    <p>• 如果第一列有重复值，系统会自动添加序号后缀（如：张三.png、张三_1.png、张三_2.png）</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="text-center mb-6">
                         <button @click="generateCertificates" :disabled="isGenerating"
                                 class="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white px-8 py-3 rounded-lg text-lg font-medium">
-                            <span v-if="!isGenerating">生成所有证书</span>
+                            <span v-if="!isGenerating">生成所有证书 ({{ excelData.length }} 张)</span>
                             <span v-else>生成中... {{ generationProgress }}%</span>
                         </button>
                     </div>
@@ -405,6 +425,19 @@
                 </div>
             </div>
         </div>
+        </main>
+
+        <!-- 版权信息 -->
+        <footer class="bg-gray-800 text-white py-4 mt-auto">
+            <div class="container mx-auto px-4 text-center">
+                <p class="text-sm mb-1">
+                    © 2024 Aeven. All rights reserved. | 批量证书生成器
+                </p>
+                <p class="text-xs text-gray-400">
+                    MIT License
+                </p>
+            </div>
+        </footer>
     </div>
 
     <script src="app.js"></script>

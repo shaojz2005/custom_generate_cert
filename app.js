@@ -1,28 +1,3 @@
-/**
- * 批量证书生成器 - Vue.js应用
- * 
- * Copyright (c) 2024 [您的姓名或组织名称]
- * 
- * 本作品采用知识共享署名-非商业性使用 4.0 国际许可协议进行许可。
- * This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.
- * 
- * 您可以自由地：
- * - 共享 — 在任何媒介以任何形式复制、发行本作品
- * - 演绎 — 修改、转换或以本作品为基础进行创作
- * 
- * 惟须遵守下列条件：
- * - 署名 — 您必须给出适当的署名，提供指向本许可协议的链接，同时标明是否作了修改
- * - 非商业性使用 — 您不得将本作品用于商业目的
- * 
- * 完整许可协议：https://creativecommons.org/licenses/by-nc/4.0/legalcode.zh-Hans
- * 
- * 功能：
- * 1. Excel文件上传和解析
- * 2. 背景图片上传
- * 3. 可视化证书设计
- * 4. 批量生成和下载
- */
-
 const { createApp } = Vue;
 
 // 统一的字体设置常量，确保网页和Canvas使用相同字体
@@ -40,7 +15,7 @@ createApp({
             selectedElement: null,
             nextElementId: 1,
             canvasWidth: 800,
-            canvasHeight: 800, // 增加画布高度，提供更多设计空间
+            canvasHeight: 800,
             originalImageWidth: 0,
             originalImageHeight: 0,
             editScaleRatio: 1,
@@ -137,8 +112,8 @@ createApp({
         },
 
         /**
-         * 检测并格式化Excel日期数据
-         * @param {any} value - 可能是日期的值
+         * 格式化Excel数据为文本
+         * @param {any} value - Excel单元格的值
          * @returns {string} 格式化后的字符串
          */
         formatExcelValue(value) {
@@ -147,29 +122,7 @@ createApp({
                 return '';
             }
             
-            // 检测是否为Excel日期序列号（通常是5位数字，范围大约在1到50000之间）
-            if (typeof value === 'number' && value > 1 && value < 100000 && Number.isInteger(value)) {
-                try {
-                    // Excel日期序列号转换为JavaScript日期
-                    // Excel的日期起始点是1900年1月1日，但实际上Excel错误地认为1900年是闰年
-                    // 所以需要减去2天来修正
-                    const excelEpoch = new Date(1900, 0, 1);
-                    const jsDate = new Date(excelEpoch.getTime() + (value - 2) * 24 * 60 * 60 * 1000);
-                    
-                    // 检查转换后的日期是否合理（1900年到2100年之间）
-                    if (jsDate.getFullYear() >= 1900 && jsDate.getFullYear() <= 2100) {
-                        // 格式化为 YYYY-MM-DD 格式
-                        const year = jsDate.getFullYear();
-                        const month = String(jsDate.getMonth() + 1).padStart(2, '0');
-                        const day = String(jsDate.getDate()).padStart(2, '0');
-                        return `${year}-${month}-${day}`;
-                    }
-                } catch (error) {
-                    console.warn('日期转换失败:', value, error);
-                }
-            }
-            
-            // 如果不是日期或转换失败，返回原始值的字符串形式
+            // 直接返回原始值的字符串形式，不进行任何特殊处理
             return String(value);
         },
 
