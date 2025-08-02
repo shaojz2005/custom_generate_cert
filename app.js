@@ -11,8 +11,8 @@ createApp({
             textElements: [],
             selectedElement: null,
             nextElementId: 1,
-            canvasWidth: 800,
-            canvasHeight: 600,
+            canvasWidth: 1200,
+            canvasHeight: 900,
             originalImageWidth: 0,
             originalImageHeight: 0,
             editScaleRatio: 1,
@@ -79,8 +79,8 @@ createApp({
                     this.originalImageHeight = img.height;
                     
                     // 计算合适的画布尺寸，保持宽高比
-                    const maxWidth = 800;
-                    const maxHeight = 600;
+                    const maxWidth = 1200;
+                    const maxHeight = 900;
                     const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
                     
                     this.canvasWidth = Math.floor(img.width * ratio);
@@ -355,8 +355,9 @@ createApp({
                     // 绘制背景图
                     ctx.drawImage(img, 0, 0);
                     
-                    // 计算从编辑坐标到原始图片坐标的缩放比例
-                    const editToOriginalScale = 1 / this.editScaleRatio;
+                    // 计算缩放比例
+                    const scaleX = img.width / this.canvasWidth;
+                    const scaleY = img.height / this.canvasHeight;
                     
                     // 绘制文本元素
                     this.textElements.forEach(element => {
@@ -368,31 +369,20 @@ createApp({
                             text = text.replace(regex, rowData[header] || '');
                         });
                         
-                        ctx.font = `${element.fontWeight} ${element.fontSize * editToOriginalScale}px Arial`;
+                        ctx.font = `${element.fontWeight} ${element.fontSize * scaleY}px Arial`;
                         ctx.fillStyle = element.color;
                         ctx.textBaseline = 'top';
                         
                         // 设置文本对齐方式
                         ctx.textAlign = element.textAlign || 'left';
                         
-                        // 计算正确的文本位置
-                        let textX = element.x * editToOriginalScale;
-                        const textY = element.y * editToOriginalScale;
-                        
-                        // 根据对齐方式调整X坐标
-                        if (element.textAlign === 'center') {
-                            // 居中对齐时，X坐标保持不变，Canvas会自动居中
-                        } else if (element.textAlign === 'right') {
-                            // 右对齐时，X坐标保持不变，Canvas会自动右对齐
-                        }
-                        
                         // 处理多行文本
                         const lines = text.split('\n');
                         lines.forEach((line, lineIndex) => {
                             ctx.fillText(
                                 line,
-                                textX,
-                                textY + lineIndex * element.fontSize * editToOriginalScale * 1.2
+                                element.x * scaleX,
+                                (element.y + lineIndex * element.fontSize * 1.2) * scaleY
                             );
                         });
                     });
@@ -401,6 +391,98 @@ createApp({
                 };
                 img.src = this.backgroundImage;
             });
+        },
+
+        /**
+         * 获取垂直对齐的CSS类
+         * @param {string} verticalAlign - 垂直对齐方式 (top, middle, bottom)
+         * @returns {string} CSS flexbox对齐值
+         */
+        getVerticalAlignClass(verticalAlign) {
+            switch (verticalAlign) {
+                case 'top':
+                    return 'flex-start';
+                case 'middle':
+                    return 'center';
+                case 'bottom':
+                    return 'flex-end';
+                default:
+                    return 'flex-start';
+            }
+        },
+
+        /**
+         * 获取水平对齐的CSS类
+         * @param {string} textAlign - 水平对齐方式 (left, center, right)
+         * @returns {string} CSS flexbox对齐值
+         */
+        getHorizontalAlignClass(textAlign) {
+            switch (textAlign) {
+                case 'left':
+                    return 'flex-start';
+                case 'center':
+                    return 'center';
+                case 'right':
+                    return 'flex-end';
+                default:
+                    return 'flex-start';
+            }
+        },
+
+        /**
+         * 自动调整元素尺寸以适应文本内容
+         * @param {Object} element - 文本元素对象
+         */
+        updateElementSize(element) {
+            if (!element) return;
+            
+            // 创建临时canvas来测量文本尺寸
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.font = `${element.fontWeight} ${element.fontSize}px Arial`;
+            
+            // 计算文本尺寸
+            const size = this.calculateTextSize(element.text, ctx, element.width);
+            
+            // 更新元素尺寸，添加一些内边距
+            element.width = Math.max(size.width + 16, 100);
+            element.height = Math.max(size.height + 16, 30);
+        },
+
+        /**
+         * 开始调整元素尺寸
+         * @param {Object} element - 要调整的元素
+         * @param {string} direction - 调整方向 ('se', 'e', 's')
+         * @param {Event} event - 鼠标事件
+         */
+        startResize(element, direction, event) {
+            event.preventDefault();
+            this.selectElement(element);
+            
+            const startX = event.clientX;
+            const startY = event.clientY;
+            const startWidth = element.width;
+            const startHeight = element.height;
+            
+            const handleMouseMove = (e) => {
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+                
+                if (direction === 'se' || direction === 'e') {
+                    element.width = Math.max(50, startWidth + deltaX);
+                }
+                if (direction === 'se' || direction === 's') {
+                    element.height = Math.max(20, startHeight + deltaY);
+                }
+            };
+            
+            const handleMouseUp = () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
+            
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
         }
     },
 
