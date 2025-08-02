@@ -10,27 +10,39 @@
     <script src="lib/jszip.min.js"></script>
     <script src="lib/FileSaver.min.js"></script>
     <style>
+        /* 全局字体设置 - 微软雅黑兼容苹果字体 */
+        body, html, * {
+            font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", Arial, sans-serif;
+        }
+        
         .canvas-container {
             position: relative;
             border: 2px dashed #d1d5db;
             background-color: #f9fafb;
         }
+        .text-element-container {
+            position: absolute;
+        }
         .text-element {
             position: absolute;
             cursor: move;
             border: 1px dashed #d1d5db;
-            padding: 0; /* 移除内边距，让文本更精确对齐 */
+            padding: 4px;
             display: flex;
             align-items: flex-start;
             justify-content: flex-start;
             background-color: rgba(255, 255, 255, 0.1);
-            overflow: hidden;
+            overflow: visible;
             word-wrap: break-word;
             word-break: break-word;
-            white-space: normal;
+            white-space: pre-wrap;
             box-sizing: border-box;
-            line-height: 1.2; /* 与Canvas绘制保持一致的行高 */
-            font-family: Arial, sans-serif; /* 确保字体与Canvas一致 */
+            line-height: 1.2;
+            font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", Arial, sans-serif;
+            hyphens: auto;
+            overflow-wrap: break-word;
+            user-select: none;
+            z-index: 10;
         }
         .text-element:hover {
             border-color: #3b82f6;
@@ -53,40 +65,50 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
+            z-index: 1000;
         }
 
         .resize-handle {
             position: absolute;
-            background-color: #007bff;
-            border: 1px solid #fff;
+            background-color: transparent;
+            border: none;
             pointer-events: auto;
-            z-index: 10;
+            z-index: 1001;
+            opacity: 0;
+        }
+
+        .resize-handle:hover {
+            background-color: transparent;
+            opacity: 0;
         }
 
         .resize-handle-se {
-            width: 8px;
-            height: 8px;
-            bottom: -4px;
-            right: -4px;
+            width: 10px;
+            height: 10px;
+            bottom: -5px;
+            right: -5px;
             cursor: se-resize;
+            border-radius: 2px;
         }
 
         .resize-handle-e {
-            width: 6px;
-            height: 20px;
+            width: 8px;
+            height: 24px;
             top: 50%;
-            right: -3px;
+            right: -4px;
             transform: translateY(-50%);
             cursor: e-resize;
+            border-radius: 2px;
         }
 
         .resize-handle-s {
-            width: 20px;
-            height: 6px;
-            bottom: -3px;
+            width: 24px;
+            height: 8px;
+            bottom: -4px;
             left: 50%;
             transform: translateX(-50%);
             cursor: s-resize;
+            border-radius: 2px;
         }
     </style>
 </head>
@@ -96,13 +118,10 @@
             <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">批量证书生成器</h1>
             
             <!-- 功能介绍区 -->
-            <div v-if="step === 1" class="max-w-4xl mx-auto mb-8">
+            <div v-if="step === 1" class="max-w-6xl mx-auto mb-8">
                 <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 text-center border border-blue-100">
                     <p class="text-lg text-gray-700 mb-3">
-                        一个专业的证书批量生成工具，支持Excel数据导入、可视化设计和文本精确排版
-                    </p>
-                    <p class="text-gray-600 mb-4">
-                        支持水平垂直对齐、文本框尺寸调整、智能换行等专业排版功能，让您轻松制作精美证书
+                        高效的证书批量生成工具，支持Excel数据导入、可视化设计和文本精确排版，并能够打包批量导出证书。
                     </p>
                     <div class="flex justify-center">
                         <a href="example.html" target="_blank" 
@@ -140,7 +159,7 @@
             </div>
 
             <!-- 步骤1: 文件上传 -->
-            <div v-if="step === 1" class="max-w-4xl mx-auto">
+            <div v-if="step === 1" class="max-w-6xl mx-auto">
                 <div class="bg-white rounded-lg shadow-md p-6 mb-6">
                     <h2 class="text-xl font-semibold mb-4">1. 上传Excel文件</h2>
                     <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
@@ -241,18 +260,7 @@
                                             <option value="bottom">底部对齐</option>
                                         </select>
                                     </div>
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <label class="block text-sm font-medium mb-1">宽度</label>
-                                            <input v-model.number="selectedElement.width" type="number" min="50" max="800"
-                                                   class="w-full border rounded px-2 py-1">
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium mb-1">高度</label>
-                                            <input v-model.number="selectedElement.height" type="number" min="20" max="400"
-                                                   class="w-full border rounded px-2 py-1">
-                                        </div>
-                                    </div>
+
                                     <div>
                                         <label class="block text-sm font-medium mb-1">文本内容</label>
                                         <textarea v-model="selectedElement.text" 
@@ -280,36 +288,48 @@
                             <div class="canvas-container mx-auto" 
                                  :style="{ width: canvasWidth + 'px', height: canvasHeight + 'px', backgroundImage: `url(${backgroundImage})`, backgroundSize: canvasWidth + 'px ' + canvasHeight + 'px', backgroundRepeat: 'no-repeat', backgroundPosition: '0 0' }"
                                  @click="deselectElement">
+                                <!-- 文本元素容器 -->
                                 <div v-for="(element, index) in textElements" :key="element.id"
-                                     class="text-element"
-                                     :class="{ selected: selectedElement === element }"
+                                     class="text-element-container"
                                      :style="{ 
                                          left: element.x + 'px', 
                                          top: element.y + 'px',
                                          width: (element.width || 200) + 'px',
-                                         height: (element.height || 40) + 'px',
-                                         fontSize: element.fontSize + 'px',
-                                         color: element.color,
-                                         fontWeight: element.fontWeight,
-                                         textAlign: element.textAlign || 'left',
-                                         alignItems: getVerticalAlignClass(element.verticalAlign),
-                                         justifyContent: getHorizontalAlignClass(element.textAlign)
-                                     }"
-                                     @click.stop="selectElement(element)"
-                                     @mousedown="startDrag(element, $event)">
-                                    {{ element.text }}
+                                         height: (element.height || 40) + 'px'
+                                     }">
+                                    
+                                    <!-- 文本元素 -->
+                                    <div class="text-element"
+                                         :class="{ selected: selectedElement === element }"
+                                         :style="{ 
+                                             width: '100%',
+                                             height: '100%',
+                                             fontSize: element.fontSize + 'px',
+                                             color: element.color,
+                                             fontWeight: element.fontWeight,
+                                             textAlign: element.textAlign || 'left',
+                                             alignItems: getVerticalAlignClass(element.verticalAlign),
+                                             justifyContent: getHorizontalAlignClass(element.textAlign)
+                                         }"
+                                         @click.stop="selectElement(element)"
+                                         @mousedown="startDrag(element, $event)"
+                                         v-html="formatTextForDisplay(element.text)">
+                                    </div>
                                     
                                     <!-- 拖拽调整尺寸的手柄 -->
                                     <div v-if="selectedElement === element" class="resize-handles">
                                         <!-- 右下角拖拽手柄 -->
                                         <div class="resize-handle resize-handle-se" 
-                                             @mousedown.stop="startResize(element, 'se', $event)"></div>
+                                             @mousedown.stop="startResize(element, 'se', $event)"
+                                             title="右下角调整"></div>
                                         <!-- 右边拖拽手柄 -->
                                         <div class="resize-handle resize-handle-e" 
-                                             @mousedown.stop="startResize(element, 'e', $event)"></div>
+                                             @mousedown.stop="startResize(element, 'e', $event)"
+                                             title="右边调整"></div>
                                         <!-- 下边拖拽手柄 -->
                                         <div class="resize-handle resize-handle-s" 
-                                             @mousedown.stop="startResize(element, 's', $event)"></div>
+                                             @mousedown.stop="startResize(element, 's', $event)"
+                                             title="下边调整"></div>
                                     </div>
                                 </div>
                             </div>
@@ -332,7 +352,7 @@
             </div>
 
             <!-- 步骤3: 生成下载 -->
-            <div v-if="step === 3" class="max-w-4xl mx-auto">
+            <div v-if="step === 3" class="max-w-6xl mx-auto">
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-xl font-semibold mb-4">3. 生成证书</h2>
                     

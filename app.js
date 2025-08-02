@@ -1,4 +1,32 @@
+/**
+ * 批量证书生成器 - Vue.js应用
+ * 
+ * Copyright (c) 2024 [您的姓名或组织名称]
+ * 
+ * 本作品采用知识共享署名-非商业性使用 4.0 国际许可协议进行许可。
+ * This work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.
+ * 
+ * 您可以自由地：
+ * - 共享 — 在任何媒介以任何形式复制、发行本作品
+ * - 演绎 — 修改、转换或以本作品为基础进行创作
+ * 
+ * 惟须遵守下列条件：
+ * - 署名 — 您必须给出适当的署名，提供指向本许可协议的链接，同时标明是否作了修改
+ * - 非商业性使用 — 您不得将本作品用于商业目的
+ * 
+ * 完整许可协议：https://creativecommons.org/licenses/by-nc/4.0/legalcode.zh-Hans
+ * 
+ * 功能：
+ * 1. Excel文件上传和解析
+ * 2. 背景图片上传
+ * 3. 可视化证书设计
+ * 4. 批量生成和下载
+ */
+
 const { createApp } = Vue;
+
+// 统一的字体设置常量，确保网页和Canvas使用相同字体
+const FONT_FAMILY = '"Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", Arial, sans-serif';
 
 createApp({
     data() {
@@ -11,12 +39,13 @@ createApp({
             textElements: [],
             selectedElement: null,
             nextElementId: 1,
-            canvasWidth: 1200,
-            canvasHeight: 900,
+            canvasWidth: 800,
+            canvasHeight: 800, // 增加画布高度，提供更多设计空间
             originalImageWidth: 0,
             originalImageHeight: 0,
             editScaleRatio: 1,
             isDragging: false,
+            isResizing: false,
             dragOffset: { x: 0, y: 0 },
             isGenerating: false,
             generationProgress: 0,
@@ -79,8 +108,8 @@ createApp({
                     this.originalImageHeight = img.height;
                     
                     // 计算合适的画布尺寸，保持宽高比
-                    const maxWidth = 1200;
-                    const maxHeight = 900;
+                    const maxWidth = 800;
+                    const maxHeight = 800; // 增加最大高度限制
                     const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
                     
                     this.canvasWidth = Math.floor(img.width * ratio);
@@ -108,25 +137,149 @@ createApp({
         },
 
         /**
+         * 检测并格式化Excel日期数据
+         * @param {any} value - 可能是日期的值
+         * @returns {string} 格式化后的字符串
+         */
+        formatExcelValue(value) {
+            // 如果值为空或undefined，返回空字符串
+            if (value === null || value === undefined || value === '') {
+                return '';
+            }
+            
+            // 检测是否为Excel日期序列号（通常是5位数字，范围大约在1到50000之间）
+            if (typeof value === 'number' && value > 1 && value < 100000 && Number.isInteger(value)) {
+                try {
+                    // Excel日期序列号转换为JavaScript日期
+                    // Excel的日期起始点是1900年1月1日，但实际上Excel错误地认为1900年是闰年
+                    // 所以需要减去2天来修正
+                    const excelEpoch = new Date(1900, 0, 1);
+                    const jsDate = new Date(excelEpoch.getTime() + (value - 2) * 24 * 60 * 60 * 1000);
+                    
+                    // 检查转换后的日期是否合理（1900年到2100年之间）
+                    if (jsDate.getFullYear() >= 1900 && jsDate.getFullYear() <= 2100) {
+                        // 格式化为 YYYY-MM-DD 格式
+                        const year = jsDate.getFullYear();
+                        const month = String(jsDate.getMonth() + 1).padStart(2, '0');
+                        const day = String(jsDate.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                    }
+                } catch (error) {
+                    console.warn('日期转换失败:', value, error);
+                }
+            }
+            
+            // 如果不是日期或转换失败，返回原始值的字符串形式
+            return String(value);
+        },
+
+        /**
+         * 计算文本内容的自然尺寸
+         * @param {string} text - 文本内容
+         * @param {number} fontSize - 字体大小
+         * @param {string} fontWeight - 字体粗细
+         * @returns {Object} 包含width和height的对象
+         */
+        calculateTextSize(text, fontSize, fontWeight = 'normal', maxWidth = null) {
+            // 创建临时DOM元素来测量文本尺寸，确保与HTML渲染一致
+            const tempElement = document.createElement('div');
+            tempElement.style.position = 'absolute';
+            tempElement.style.visibility = 'hidden';
+            tempElement.style.whiteSpace = 'nowrap';
+            tempElement.style.fontSize = fontSize + 'px';
+            tempElement.style.fontWeight = fontWeight;
+            tempElement.style.fontFamily = FONT_FAMILY;
+            tempElement.style.lineHeight = '1.2';
+            tempElement.style.padding = '0';
+            tempElement.style.margin = '0';
+            tempElement.style.border = 'none';
+            tempElement.textContent = text;
+            
+            document.body.appendChild(tempElement);
+            
+            // 如果没有指定最大宽度，先计算文本的自然宽度
+            if (!maxWidth) {
+                const naturalMaxWidth = tempElement.offsetWidth;
+                
+                // 检查是否是变量文本（包含双括号）
+                const isVariableText = text.includes('{{') && text.includes('}}');
+                
+                // 设置一个合理的最大宽度限制，避免文本框过宽
+                // 对于短文本和变量文本使用自然宽度，对于长文本限制最大宽度
+                if (naturalMaxWidth <= 200 || isVariableText) {
+                    maxWidth = naturalMaxWidth;
+                } else {
+                    // 长文本使用合理的最大宽度，通常是200-300px
+                    maxWidth = Math.min(naturalMaxWidth, 250);
+                }
+            }
+            
+            // 设置最大宽度并允许换行来测量实际尺寸
+            tempElement.style.whiteSpace = 'normal';
+            tempElement.style.wordWrap = 'break-word';
+            tempElement.style.wordBreak = 'break-word';
+            tempElement.style.maxWidth = maxWidth + 'px';
+            
+            const actualWidth = tempElement.offsetWidth;
+            const actualHeight = tempElement.offsetHeight;
+            
+            document.body.removeChild(tempElement);
+            
+            // 添加缓冲区确保文本有足够的显示空间
+            // 浏览器的文本渲染和测量之间可能存在差异，需要更大的缓冲区
+            // 对中文文本需要更大的缓冲区
+            const isChinese = /[\u4e00-\u9fa5]/.test(text);
+            
+            // 为加粗文本增加额外的宽度冗余
+            const isBold = fontWeight === 'bold' || fontWeight === '700' || fontWeight === '800' || fontWeight === '900';
+            const boldExtraWidth = isBold ? Math.ceil(fontSize * 0.25) : 0; // 加粗文本额外增加25%字体大小的宽度
+            
+            // 为加粗文本增加更大的基础缓冲区
+            const baseWidthBuffer = isBold ? 
+                Math.max(16, Math.ceil(fontSize * (isChinese ? 0.5 : 0.4))) : // 加粗文本使用更大的基础缓冲区
+                Math.max(12, Math.ceil(fontSize * (isChinese ? 0.4 : 0.3))); // 普通文本使用原有缓冲区
+            
+            const widthBuffer = baseWidthBuffer + boldExtraWidth; // 基础缓冲区 + 加粗额外宽度
+            const heightBuffer = Math.max(8, Math.ceil(fontSize * (isChinese ? 0.3 : 0.2))); // 中文需要更大缓冲区
+            
+            return {
+                width: Math.max(50, actualWidth + widthBuffer), // 增加最小宽度
+                height: Math.max(fontSize * 1.5, actualHeight + heightBuffer) // 增加最小高度
+            };
+        },
+
+        /**
          * 添加新的文本元素
          */
         addTextElement() {
+            const text = '点击编辑文本';
+            const fontSize = 16; // 增加默认字体大小
+            const fontWeight = 'normal';
+            
+            // 对于初始文本，使用足够大的最大宽度确保不会换行
+            const textSize = this.calculateTextSize(text, fontSize, fontWeight, 1000);
+            
             const newElement = {
                 id: this.nextElementId++,
-                text: '点击编辑文本',
+                text: text,
                 x: 50,
                 y: 50,
-                fontSize: 24,
+                fontSize: fontSize,
                 color: '#000000',
-                fontWeight: 'normal',
-                textAlign: 'left' // 新增文本对齐属性：left, center, right
+                fontWeight: fontWeight,
+                textAlign: 'left', // 水平对齐属性：left, center, right
+                verticalAlign: 'middle', // 垂直对齐属性：top, middle, bottom（默认居中）
+                width: textSize.width, // 根据内容自适应宽度
+                height: textSize.height // 根据内容自适应高度
             };
             this.textElements.push(newElement);
             this.selectElement(newElement);
         },
 
         selectElement(element) {
+            console.log('selectElement called:', element);
             this.selectedElement = element;
+            console.log('selectedElement set to:', this.selectedElement);
         },
 
         deselectElement() {
@@ -151,21 +304,195 @@ createApp({
             // 如果有选中的元素，则在其文本后追加变量
             if (this.selectedElement) {
                 this.selectedElement.text += `{{${header}}}`;
+                // 重新计算尺寸
+                this.updateElementSize(this.selectedElement);
             } else {
                 // 如果没有选中的元素，则自动创建一个新的文本元素并插入变量
+                const text = `{{${header}}}`;
+                const fontSize = 16; // 增加默认字体大小
+                const fontWeight = 'normal';
+                
+                // 对于新创建的变量文本，使用足够大的最大宽度确保不会换行
+                const textSize = this.calculateTextSize(text, fontSize, fontWeight, 1000);
+                
                 const newElement = {
                     id: this.nextElementId++,
-                    text: `{{${header}}}`,
+                    text: text,
                     x: 50,
                     y: 50 + (this.textElements.length * 40), // 避免重叠，每个新元素向下偏移
-                    fontSize: 24,
+                    fontSize: fontSize,
                     color: '#000000',
-                    fontWeight: 'normal',
-                    textAlign: 'left' // 新增文本对齐属性
+                    fontWeight: fontWeight,
+                    textAlign: 'left', // 水平对齐属性
+                    verticalAlign: 'middle', // 垂直对齐属性（默认居中）
+                    width: textSize.width, // 根据内容自适应宽度
+                    height: textSize.height // 根据内容自适应高度
                 };
                 this.textElements.push(newElement);
                 this.selectElement(newElement);
             }
+        },
+
+        /**
+         * 更新文本元素的尺寸以适应内容
+         * @param {Object} element - 文本元素对象
+         */
+        updateElementSize(element) {
+            if (!element) return;
+            
+            // 使用当前元素的宽度作为最大宽度，如果没有设置则使用更大的默认值
+            const currentWidth = element.width || 400; // 增加默认宽度
+            const textSize = this.calculateTextSize(element.text, element.fontSize, element.fontWeight, currentWidth);
+            
+            element.width = textSize.width;
+            element.height = textSize.height;
+        },
+
+        /**
+         * 获取垂直对齐的CSS类
+         * @param {string} verticalAlign - 垂直对齐方式
+         * @returns {string} CSS flexbox align-items值
+         */
+        getVerticalAlignClass(verticalAlign) {
+            switch (verticalAlign) {
+                case 'top':
+                    return 'flex-start';
+                case 'middle':
+                    return 'center';
+                case 'bottom':
+                    return 'flex-end';
+                default:
+                    return 'flex-start';
+            }
+        },
+
+        /**
+         * 获取Canvas文本基线对齐
+         * @param {string} verticalAlign - 垂直对齐方式
+         * @returns {string} Canvas textBaseline值
+         */
+        getCanvasTextBaseline(verticalAlign) {
+            switch (verticalAlign) {
+                case 'top':
+                    return 'top';
+                case 'middle':
+                    return 'middle';
+                case 'bottom':
+                    return 'bottom';
+                default:
+                    return 'top';
+            }
+        },
+
+        /**
+         * 计算Canvas中文本的Y坐标
+         * @param {Object} element - 文本元素
+         * @param {number} scale - 缩放比例
+         * @returns {number} 计算后的Y坐标
+         */
+        calculateCanvasTextY(element, scale) {
+            const boxY = element.y * scale;
+            const boxHeight = (element.height || 40) * scale;
+            
+            switch (element.verticalAlign) {
+                case 'top':
+                    return boxY; // 无内边距，直接从顶部开始
+                case 'middle':
+                    return boxY + boxHeight / 2;
+                case 'bottom':
+                    return boxY + boxHeight; // 无内边距，直接到底部
+                default:
+                    return boxY;
+            }
+        },
+
+        /**
+         * 获取水平对齐的CSS类
+         * @param {string} textAlign - 水平对齐方式
+         * @returns {string} CSS flexbox justify-content值
+         */
+        getHorizontalAlignClass(textAlign) {
+            switch (textAlign) {
+                case 'left':
+                    return 'flex-start';
+                case 'center':
+                    return 'center';
+                case 'right':
+                    return 'flex-end';
+                default:
+                    return 'flex-start';
+            }
+        },
+
+        /**
+         * 文本自动换行处理
+         * @param {CanvasRenderingContext2D} ctx - Canvas绘图上下文
+         * @param {string} text - 要处理的文本
+         * @param {number} maxWidth - 最大宽度
+         * @returns {Array} 换行后的文本数组
+         */
+        wrapText(ctx, text, maxWidth) {
+            const lines = [];
+            const paragraphs = text.split('\n');
+            
+            paragraphs.forEach(paragraph => {
+                if (paragraph.trim() === '') {
+                    lines.push('');
+                    return;
+                }
+                
+                // 先按空格分词
+                const words = paragraph.split(' ');
+                let currentLine = '';
+                
+                for (let i = 0; i < words.length; i++) {
+                    const word = words[i];
+                    const testLine = currentLine + (currentLine ? ' ' : '') + word;
+                    const metrics = ctx.measureText(testLine);
+                    
+                    if (metrics.width > maxWidth && currentLine !== '') {
+                        lines.push(currentLine);
+                        currentLine = word;
+                        
+                        // 检查单个单词是否仍然太长，需要强制换行
+                        while (ctx.measureText(currentLine).width > maxWidth && currentLine.length > 1) {
+                            let breakPoint = currentLine.length - 1;
+                            
+                            // 找到合适的断点
+                            while (breakPoint > 0 && ctx.measureText(currentLine.substring(0, breakPoint)).width > maxWidth) {
+                                breakPoint--;
+                            }
+                            
+                            if (breakPoint === 0) breakPoint = 1; // 至少保留一个字符
+                            
+                            lines.push(currentLine.substring(0, breakPoint));
+                            currentLine = currentLine.substring(breakPoint);
+                        }
+                    } else {
+                        currentLine = testLine;
+                    }
+                }
+                
+                // 处理最后一行，如果仍然太长则强制换行
+                while (currentLine && ctx.measureText(currentLine).width > maxWidth && currentLine.length > 1) {
+                    let breakPoint = currentLine.length - 1;
+                    
+                    while (breakPoint > 0 && ctx.measureText(currentLine.substring(0, breakPoint)).width > maxWidth) {
+                        breakPoint--;
+                    }
+                    
+                    if (breakPoint === 0) breakPoint = 1;
+                    
+                    lines.push(currentLine.substring(0, breakPoint));
+                    currentLine = currentLine.substring(breakPoint);
+                }
+                
+                if (currentLine) {
+                    lines.push(currentLine);
+                }
+            });
+            
+            return lines;
         },
 
         // 拖拽功能
@@ -194,6 +521,60 @@ createApp({
 
             const handleMouseUp = () => {
                 this.isDragging = false;
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
+
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        },
+
+        /**
+         * 开始拖拽调整尺寸
+         * @param {Object} element - 文本元素对象
+         * @param {string} direction - 拖拽方向：'se'(右下角), 'e'(右边), 's'(下边)
+         * @param {Event} event - 鼠标事件
+         */
+        startResize(element, direction, event) {
+            console.log('startResize called:', direction, element);
+            event.preventDefault();
+            event.stopPropagation();
+            
+            this.isResizing = true;
+            this.selectElement(element);
+            
+            const startX = event.clientX;
+            const startY = event.clientY;
+            const startWidth = element.width || 200;
+            const startHeight = element.height || 40;
+
+            const handleMouseMove = (e) => {
+                if (this.isResizing && this.selectedElement === element) {
+                    const deltaX = e.clientX - startX;
+                    const deltaY = e.clientY - startY;
+                    
+                    let newWidth = startWidth;
+                    let newHeight = startHeight;
+                    
+                    // 根据拖拽方向调整尺寸
+                    if (direction === 'se' || direction === 'e') {
+                        newWidth = Math.max(50, startWidth + deltaX);
+                    }
+                    if (direction === 'se' || direction === 's') {
+                        newHeight = Math.max(20, startHeight + deltaY);
+                    }
+                    
+                    // 确保不超出画布边界
+                    const maxWidth = this.canvasWidth - element.x;
+                    const maxHeight = this.canvasHeight - element.y;
+                    
+                    element.width = Math.min(newWidth, maxWidth);
+                    element.height = Math.min(newHeight, maxHeight);
+                }
+            };
+
+            const handleMouseUp = () => {
+                this.isResizing = false;
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
             };
@@ -303,36 +684,59 @@ createApp({
                         // 替换变量
                         this.excelHeaders.forEach(header => {
                             const regex = new RegExp(`{{${header}}}`, 'g');
-                            text = text.replace(regex, rowData[header] || '');
+                            const formattedValue = this.formatExcelValue(rowData[header]);
+                            text = text.replace(regex, formattedValue);
                         });
                         
-                        ctx.font = `${element.fontWeight} ${element.fontSize * finalScale}px Arial`;
+                        ctx.font = `${element.fontWeight} ${element.fontSize * finalScale}px ${FONT_FAMILY}`;
                         ctx.fillStyle = element.color;
-                        ctx.textBaseline = 'top';
                         
                         // 设置文本对齐方式
                         ctx.textAlign = element.textAlign || 'left';
                         
-                        // 计算正确的文本位置
-                        let textX = element.x * finalScale;
-                        const textY = element.y * finalScale;
+                        // 设置垂直对齐基线
+                        const verticalAlign = element.verticalAlign || 'middle';
+                        ctx.textBaseline = this.getCanvasTextBaseline(verticalAlign);
                         
-                        // 根据对齐方式调整X坐标
+                        // 计算文本框的位置和尺寸
+                        const boxX = element.x * finalScale;
+                        const boxY = element.y * finalScale;
+                        const boxWidth = (element.width || 200) * finalScale;
+                        const boxHeight = (element.height || 40) * finalScale;
+                        
+                        // 计算文本起始位置（根据对齐方式）
+                        let textX = boxX; // 左对齐时直接从左边开始
                         if (element.textAlign === 'center') {
-                            // 居中对齐时，X坐标保持不变，Canvas会自动居中
+                            textX = boxX + boxWidth / 2;
                         } else if (element.textAlign === 'right') {
-                            // 右对齐时，X坐标保持不变，Canvas会自动右对齐
+                            textX = boxX + boxWidth; // 右对齐时直接到右边
                         }
                         
-                        // 处理多行文本
-                        const lines = text.split('\n');
+                        // 使用统一的Y坐标计算方法
+                        let textY = this.calculateCanvasTextY(element, finalScale);
+                        
+                        // 保存当前绘图状态
+                        ctx.save();
+                        
+                        // 设置裁剪区域为文本框边界
+                        ctx.beginPath();
+                        ctx.rect(boxX, boxY, boxWidth, boxHeight);
+                        ctx.clip();
+                        
+                        // 处理文本自动换行
+                        const lines = this.wrapText(ctx, text, boxWidth);
+                        const lineHeight = element.fontSize * finalScale * 1.2;
+                        
                         lines.forEach((line, lineIndex) => {
-                            ctx.fillText(
-                                line,
-                                textX,
-                                textY + lineIndex * element.fontSize * finalScale * 1.2
-                            );
+                            const currentY = textY + lineIndex * lineHeight;
+                            // 只绘制在文本框高度范围内的文本行
+                            if (currentY >= boxY && currentY <= boxY + boxHeight) {
+                                ctx.fillText(line, textX, currentY);
+                            }
                         });
+                        
+                        // 恢复绘图状态
+                        ctx.restore();
                     });
                     
                     resolve(canvas);
@@ -355,9 +759,8 @@ createApp({
                     // 绘制背景图
                     ctx.drawImage(img, 0, 0);
                     
-                    // 计算缩放比例
-                    const scaleX = img.width / this.canvasWidth;
-                    const scaleY = img.height / this.canvasHeight;
+                    // 计算从编辑坐标到原始图片坐标的缩放比例
+                    const editToOriginalScale = 1 / this.editScaleRatio;
                     
                     // 绘制文本元素
                     this.textElements.forEach(element => {
@@ -366,25 +769,59 @@ createApp({
                         // 替换变量
                         this.excelHeaders.forEach(header => {
                             const regex = new RegExp(`{{${header}}}`, 'g');
-                            text = text.replace(regex, rowData[header] || '');
+                            const formattedValue = this.formatExcelValue(rowData[header]);
+                            text = text.replace(regex, formattedValue);
                         });
                         
-                        ctx.font = `${element.fontWeight} ${element.fontSize * scaleY}px Arial`;
+                        ctx.font = `${element.fontWeight} ${element.fontSize * editToOriginalScale}px ${FONT_FAMILY}`;
                         ctx.fillStyle = element.color;
-                        ctx.textBaseline = 'top';
                         
                         // 设置文本对齐方式
                         ctx.textAlign = element.textAlign || 'left';
                         
-                        // 处理多行文本
-                        const lines = text.split('\n');
+                        // 设置垂直对齐基线
+                        const verticalAlign = element.verticalAlign || 'middle';
+                        ctx.textBaseline = this.getCanvasTextBaseline(verticalAlign);
+                        
+                        // 计算文本框的位置和尺寸
+                        const boxX = element.x * editToOriginalScale;
+                        const boxY = element.y * editToOriginalScale;
+                        const boxWidth = (element.width || 200) * editToOriginalScale;
+                        const boxHeight = (element.height || 40) * editToOriginalScale;
+                        
+                        // 计算文本起始位置（根据对齐方式）
+                        let textX = boxX; // 左对齐时直接从左边开始
+                        if (element.textAlign === 'center') {
+                            textX = boxX + boxWidth / 2;
+                        } else if (element.textAlign === 'right') {
+                            textX = boxX + boxWidth; // 右对齐时直接到右边
+                        }
+                        
+                        // 使用统一的Y坐标计算方法
+                        let textY = this.calculateCanvasTextY(element, editToOriginalScale);
+                        
+                        // 保存当前绘图状态
+                        ctx.save();
+                        
+                        // 设置裁剪区域为文本框边界
+                        ctx.beginPath();
+                        ctx.rect(boxX, boxY, boxWidth, boxHeight);
+                        ctx.clip();
+                        
+                        // 处理文本自动换行
+                        const lines = this.wrapText(ctx, text, boxWidth);
+                        const lineHeight = element.fontSize * editToOriginalScale * 1.2;
+                        
                         lines.forEach((line, lineIndex) => {
-                            ctx.fillText(
-                                line,
-                                element.x * scaleX,
-                                (element.y + lineIndex * element.fontSize * 1.2) * scaleY
-                            );
+                            const currentY = textY + lineIndex * lineHeight;
+                            // 只绘制在文本框高度范围内的文本行
+                            if (currentY >= boxY && currentY <= boxY + boxHeight) {
+                                ctx.fillText(line, textX, currentY);
+                            }
                         });
+                        
+                        // 恢复绘图状态
+                        ctx.restore();
                     });
                     
                     resolve(canvas);
@@ -394,95 +831,22 @@ createApp({
         },
 
         /**
-         * 获取垂直对齐的CSS类
-         * @param {string} verticalAlign - 垂直对齐方式 (top, middle, bottom)
-         * @returns {string} CSS flexbox对齐值
+         * 格式化文本以在HTML中显示，处理换行符
+         * @param {string} text - 要格式化的文本
+         * @returns {string} 格式化后的HTML字符串
          */
-        getVerticalAlignClass(verticalAlign) {
-            switch (verticalAlign) {
-                case 'top':
-                    return 'flex-start';
-                case 'middle':
-                    return 'center';
-                case 'bottom':
-                    return 'flex-end';
-                default:
-                    return 'flex-start';
-            }
-        },
-
-        /**
-         * 获取水平对齐的CSS类
-         * @param {string} textAlign - 水平对齐方式 (left, center, right)
-         * @returns {string} CSS flexbox对齐值
-         */
-        getHorizontalAlignClass(textAlign) {
-            switch (textAlign) {
-                case 'left':
-                    return 'flex-start';
-                case 'center':
-                    return 'center';
-                case 'right':
-                    return 'flex-end';
-                default:
-                    return 'flex-start';
-            }
-        },
-
-        /**
-         * 自动调整元素尺寸以适应文本内容
-         * @param {Object} element - 文本元素对象
-         */
-        updateElementSize(element) {
-            if (!element) return;
+        formatTextForDisplay(text) {
+            if (!text) return '';
             
-            // 创建临时canvas来测量文本尺寸
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            ctx.font = `${element.fontWeight} ${element.fontSize}px Arial`;
-            
-            // 计算文本尺寸
-            const size = this.calculateTextSize(element.text, ctx, element.width);
-            
-            // 更新元素尺寸，添加一些内边距
-            element.width = Math.max(size.width + 16, 100);
-            element.height = Math.max(size.height + 16, 30);
-        },
-
-        /**
-         * 开始调整元素尺寸
-         * @param {Object} element - 要调整的元素
-         * @param {string} direction - 调整方向 ('se', 'e', 's')
-         * @param {Event} event - 鼠标事件
-         */
-        startResize(element, direction, event) {
-            event.preventDefault();
-            this.selectElement(element);
-            
-            const startX = event.clientX;
-            const startY = event.clientY;
-            const startWidth = element.width;
-            const startHeight = element.height;
-            
-            const handleMouseMove = (e) => {
-                const deltaX = e.clientX - startX;
-                const deltaY = e.clientY - startY;
-                
-                if (direction === 'se' || direction === 'e') {
-                    element.width = Math.max(50, startWidth + deltaX);
-                }
-                if (direction === 'se' || direction === 's') {
-                    element.height = Math.max(20, startHeight + deltaY);
-                }
+            // 转义HTML特殊字符
+            const escapeHtml = (str) => {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
             };
             
-            const handleMouseUp = () => {
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-            };
-            
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
+            // 转义HTML并将换行符转换为<br>标签
+            return escapeHtml(text).replace(/\n/g, '<br>');
         }
     },
 
