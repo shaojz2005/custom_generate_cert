@@ -3,6 +3,28 @@ const { createApp } = Vue;
 // 统一的字体设置常量，确保网页和Canvas使用相同字体
 const FONT_FAMILY = '"Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", Arial, sans-serif';
 
+/**
+ * 构建字体字符串，支持自定义字体和兜底机制
+ * @param {string} customFont - 用户指定的字体名称
+ * @returns {string} 完整的字体字符串
+ */
+function buildFontFamily(customFont) {
+    if (!customFont || customFont.trim() === '') {
+        // 如果没有指定自定义字体，使用默认字体
+        return FONT_FAMILY;
+    }
+    
+    // 清理字体名称，去除多余的引号和空格
+    const cleanFont = customFont.trim().replace(/^["']|["']$/g, '');
+    
+    // 如果字体名称包含空格或中文，需要加引号
+    const needsQuotes = /[\s\u4e00-\u9fa5]/.test(cleanFont);
+    const quotedFont = needsQuotes ? `"${cleanFont}"` : cleanFont;
+    
+    // 将自定义字体放在最前面，后面跟上默认字体作为兜底
+    return `${quotedFont}, ${FONT_FAMILY}`;
+}
+
 createApp({
     data() {
         return {
@@ -35,6 +57,8 @@ createApp({
         }
     },
     methods: {
+        // 将全局函数添加到Vue实例中，使其在模板中可用
+        buildFontFamily,
         // 文件上传处理
         handleExcelUpload(event) {
             const file = event.target.files[0];
@@ -131,9 +155,11 @@ createApp({
          * @param {string} text - 文本内容
          * @param {number} fontSize - 字体大小
          * @param {string} fontWeight - 字体粗细
+         * @param {string} fontFamily - 字体名称
+         * @param {number} maxWidth - 最大宽度
          * @returns {Object} 包含width和height的对象
          */
-        calculateTextSize(text, fontSize, fontWeight = 'normal', maxWidth = null) {
+        calculateTextSize(text, fontSize, fontWeight = 'normal', fontFamily = '', maxWidth = null) {
             // 创建临时DOM元素来测量文本尺寸，确保与HTML渲染一致
             const tempElement = document.createElement('div');
             tempElement.style.position = 'absolute';
@@ -141,7 +167,7 @@ createApp({
             tempElement.style.whiteSpace = 'nowrap';
             tempElement.style.fontSize = fontSize + 'px';
             tempElement.style.fontWeight = fontWeight;
-            tempElement.style.fontFamily = FONT_FAMILY;
+            tempElement.style.fontFamily = buildFontFamily(fontFamily);
             tempElement.style.lineHeight = '1.2';
             tempElement.style.padding = '0';
             tempElement.style.margin = '0';
@@ -220,6 +246,7 @@ createApp({
                 fontSize: fontSize,
                 color: '#000000',
                 fontWeight: fontWeight,
+                fontFamily: '', // 新增字体名称属性，空字符串表示使用默认字体
                 textAlign: 'left', // 水平对齐属性：left, center, right
                 verticalAlign: 'middle', // 垂直对齐属性：top, middle, bottom（默认居中）
                 width: textSize.width, // 根据内容自适应宽度
@@ -266,7 +293,7 @@ createApp({
                 const fontWeight = 'normal';
                 
                 // 对于新创建的变量文本，使用足够大的最大宽度确保不会换行
-                const textSize = this.calculateTextSize(text, fontSize, fontWeight, 1000);
+                const textSize = this.calculateTextSize(text, fontSize, fontWeight, '', 1000);
                 
                 const newElement = {
                     id: this.nextElementId++,
@@ -295,7 +322,7 @@ createApp({
             
             // 使用当前元素的宽度作为最大宽度，如果没有设置则使用更大的默认值
             const currentWidth = element.width || 400; // 增加默认宽度
-            const textSize = this.calculateTextSize(element.text, element.fontSize, element.fontWeight, currentWidth);
+            const textSize = this.calculateTextSize(element.text, element.fontSize, element.fontWeight, element.fontFamily, currentWidth);
             
             element.width = textSize.width;
             element.height = textSize.height;
@@ -641,7 +668,7 @@ createApp({
                             text = text.replace(regex, formattedValue);
                         });
                         
-                        ctx.font = `${element.fontWeight} ${element.fontSize * finalScale}px ${FONT_FAMILY}`;
+                        ctx.font = `${element.fontWeight} ${element.fontSize * finalScale}px ${buildFontFamily(element.fontFamily)}`;
                         ctx.fillStyle = element.color;
                         
                         // 设置文本对齐方式
@@ -726,7 +753,7 @@ createApp({
                             text = text.replace(regex, formattedValue);
                         });
                         
-                        ctx.font = `${element.fontWeight} ${element.fontSize * editToOriginalScale}px ${FONT_FAMILY}`;
+                        ctx.font = `${element.fontWeight} ${element.fontSize * editToOriginalScale}px ${buildFontFamily(element.fontFamily)}`;
                         ctx.fillStyle = element.color;
                         
                         // 设置文本对齐方式

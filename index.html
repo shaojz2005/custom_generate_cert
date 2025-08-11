@@ -249,6 +249,15 @@
                                         </select>
                                     </div>
                                     <div>
+                                        <label class="block text-sm font-medium mb-1">自定义字体</label>
+                                        <input v-model="selectedElement.fontFamily" type="text" 
+                                               placeholder=""
+                                               class="w-full border rounded px-2 py-1 text-sm">
+                                        <p class="text-xs text-gray-500 mt-1">输入电脑上已安装的字体名称可进行调用，留空则使用默认字体</p>
+
+
+                                    </div>
+                                    <div>
                                         <label class="block text-sm font-medium mb-1">水平对齐</label>
                                         <select v-model="selectedElement.textAlign" class="w-full border rounded px-2 py-1">
                                             <option value="left">左对齐</option>
@@ -311,6 +320,7 @@
                                              fontSize: element.fontSize + 'px',
                                              color: element.color,
                                              fontWeight: element.fontWeight,
+                                             fontFamily: buildFontFamily(element.fontFamily),
                                              textAlign: element.textAlign || 'left',
                                              alignItems: getVerticalAlignClass(element.verticalAlign),
                                              justifyContent: getHorizontalAlignClass(element.textAlign)
