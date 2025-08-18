@@ -86,6 +86,8 @@ createApp({
                 } catch (error) {
                     alert('Excel文件解析失败，请检查文件格式');
                 }
+                // 清空input的value，确保下次上传同名文件时能触发change事件
+                event.target.value = '';
             };
             reader.readAsArrayBuffer(file);
         },
@@ -116,6 +118,9 @@ createApp({
                     
                     // 保存编辑界面的缩放比例
                     this.editScaleRatio = ratio;
+                    
+                    // 清空input的value，确保下次上传同名文件时能触发change事件
+                    event.target.value = '';
                 };
                 img.src = e.target.result;
             };
@@ -576,6 +581,7 @@ createApp({
 
             const zip = new JSZip();
             const certificates = [];
+            const fileNameCounts = {}; // 用于跟踪文件名出现次数
 
             for (let i = 0; i < this.excelData.length; i++) {
                 this.currentGeneratingIndex = i;
@@ -589,8 +595,20 @@ createApp({
                     canvas.toBlob(resolve, 'image/png');
                 });
                 
-                // 生成文件名，使用第一个字段的值或索引
-                const fileName = rowData[this.excelHeaders[0]] || `certificate_${i + 1}`;
+                // 生成基础文件名
+                let baseName = rowData[this.excelHeaders[0]] || `certificate_${i + 1}`;
+                // 清理文件名中的非法字符
+                baseName = baseName.toString().replace(/[<>:"/\\|?*]/g, '_');
+                
+                // 处理重复文件名
+                let fileName = baseName;
+                if (fileNameCounts[baseName]) {
+                    fileNameCounts[baseName]++;
+                    fileName = `${baseName}_${fileNameCounts[baseName]}`;
+                } else {
+                    fileNameCounts[baseName] = 1;
+                }
+                
                 zip.file(`${fileName}.png`, blob);
                 
                 // 添加小延迟以避免浏览器卡顿
